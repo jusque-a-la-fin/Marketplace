@@ -11,7 +11,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// Интеграционный тест на сценарий создания объявления
+// Интеграционный тест на сценарий создания нового объявления
 func TestPostACard(t *testing.T) {
 	var uhr = GetUserHandler(t)
 	rtr := mux.NewRouter()
