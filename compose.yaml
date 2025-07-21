@@ -1,0 +1,93 @@
+services:
+  marketplace:
+      build:
+        context: .
+        dockerfile: Dockerfile
+      hostname: marketplace
+      container_name: marketplace
+      ports:
+        - "8080:8080"
+      environment:
+        - DATABASE_PORT=5432
+        - DATABASE_USER=postgres
+        - DATABASE_PASSWORD=password
+        - DATABASE_NAME=marketplace
+        - DATABASE_HOST=dtb
+        - SERVER_PORT=8080
+      depends_on:
+        dtb:
+            condition: service_healthy
+      networks:
+        - internal
+  
+  dtb:
+    image: postgres:13
+    container_name: dtb
+    hostname: dtb
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: marketplace
+    volumes:
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "sh -c 'pg_isready -U postgres -d marketplace'"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+      start_period: 2s
+    networks:
+      - internal
+
+
+  dtb-test:
+    image: postgres:13
+    container_name: dtb-test
+    hostname: dtb-test
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: marketplace_test
+    volumes:
+      - ./scripts/test.sql:/docker-entrypoint-initdb.d/test.sql
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "sh -c 'pg_isready -U postgres -d marketplace_test'"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+      start_period: 2s
+    networks:
+      - internal
+
+  test: 
+    build: 
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: test
+    environment:
+        - DATABASE_PORT=5432
+        - DATABASE_USER=postgres
+        - DATABASE_PASSWORD=password
+        - DATABASE_NAME=marketplace_test
+        - DATABASE_HOST=dtb-test
+    command: >
+      sh -c "go test -v -race -cover ./..."
+    depends_on:
+      dtb-test:
+        condition: service_healthy
+    volumes:
+      - .:/marketplace
+      - ./scripts:/scripts
+      - shared-data:/data
+    networks:
+        - internal
+
+networks:
+  internal:
+
+volumes:
+  shared-data:
