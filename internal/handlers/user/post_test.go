@@ -3,7 +3,10 @@ package user_test
 import (
 	"bytes"
 	"encoding/json"
+	"log"
+	"marketplace/internal/datastore"
 	uhd "marketplace/internal/handlers/user"
+	"marketplace/internal/middleware"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,10 +16,15 @@ import (
 
 // Интеграционный тест на сценарий создания нового объявления
 func TestPostACard(t *testing.T) {
+	dtb, err := datastore.CreateNewDB()
+	if err != nil {
+		log.Fatalf("error while connecting to the database: %v", err)
+	}
+
 	var uhr = GetUserHandler(t)
 	rtr := mux.NewRouter()
 	rtr.HandleFunc("/sign-in", uhr.SignIn).Methods("POST")
-	rtr.HandleFunc("/post-a-card", uhr.PostACard).Methods("POST")
+	rtr.HandleFunc("/post-a-card", middleware.RequireAuth(uhr.PostACard, dtb, true)).Methods("POST")
 
 	ts := httptest.NewServer(rtr)
 	t.Cleanup(ts.Close)
