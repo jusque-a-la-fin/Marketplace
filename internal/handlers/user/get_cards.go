@@ -57,7 +57,7 @@ func (hnd *UserHandler) GetCards(wrt http.ResponseWriter, rqt *http.Request) {
 	authVal := rqt.Context().Value(middleware.KeyIsAuthenticated)
 	isAuthenticated, _ := authVal.(bool)
 
-	var username string
+	var username *string = nil
 	if isAuthenticated {
 		usernameStr, err := token.GetPayload(rqt)
 		if err != nil {
@@ -67,7 +67,7 @@ func (hnd *UserHandler) GetCards(wrt http.ResponseWriter, rqt *http.Request) {
 			}
 			return
 		}
-		username = usernameStr
+		username = &usernameStr
 	}
 
 	params := &cards.QueryParams{
@@ -77,7 +77,7 @@ func (hnd *UserHandler) GetCards(wrt http.ResponseWriter, rqt *http.Request) {
 		Order:    order,
 		PriceMin: priceMin,
 		PriceMax: priceMax,
-		Username: &username,
+		Username: username,
 	}
 
 	cards, err := hnd.CardsRepo.GetCards(params)
