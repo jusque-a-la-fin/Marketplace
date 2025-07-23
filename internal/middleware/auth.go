@@ -17,7 +17,7 @@ const (
 func RequireAuth(next http.HandlerFunc, dtb *sql.DB, isRequired bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		check, err := token.Check(r, dtb)
-		if err != nil {
+		if err != nil && (isRequired || err != token.ErrNoToken) {
 			log.Printf("internal error during token check: %v\n", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
