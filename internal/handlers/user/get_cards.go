@@ -12,6 +12,7 @@ import (
 	"strings"
 )
 
+// GetCards получает ленту объявлений
 func (hnd *UserHandler) GetCards(wrt http.ResponseWriter, rqt *http.Request) {
 	queryParams := rqt.URL.Query()
 	page := 1

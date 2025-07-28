@@ -21,7 +21,7 @@ func (repo *CardsDBRepository) GetCards(params *QueryParams) ([]CardOutput, erro
         SELECT
             c.title,
             c.card_text,
-            c.picture_url,
+            c.image_url,
             c.price,
             u.username
         FROM cards c
@@ -59,22 +59,22 @@ func (repo *CardsDBRepository) GetCards(params *QueryParams) ([]CardOutput, erro
 
 	var cards []CardOutput
 	for rows.Next() {
-		var c CardOutput
+		var card CardOutput
 		if err := rows.Scan(
-			&c.Title,
-			&c.Text,
-			&c.PictureURL,
-			&c.Price,
-			&c.Username,
+			&card.Title,
+			&card.Text,
+			&card.ImageURL,
+			&card.Price,
+			&card.Username,
 		); err != nil {
 			return nil, err
 		}
-		if params.Username != nil && c.Username == *params.Username {
-			c.IsOwned = true
+		if params.Username != nil && card.Username == *params.Username {
+			card.IsOwned = true
 		} else {
-			c.IsOwned = false
+			card.IsOwned = false
 		}
-		cards = append(cards, c)
+		cards = append(cards, card)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

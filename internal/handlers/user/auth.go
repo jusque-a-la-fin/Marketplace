@@ -28,6 +28,7 @@ type AuthRequest struct {
 	Password string `json:"password"`
 }
 
+// SignIn авторизует уже зарегистрированного пользователя
 func (hnd *UserHandler) SignIn(wrt http.ResponseWriter, rqt *http.Request) {
 	usr, _ := ProcessRequest(wrt, rqt)
 	if usr == nil {
@@ -58,6 +59,7 @@ func (hnd *UserHandler) SignIn(wrt http.ResponseWriter, rqt *http.Request) {
 	ProcessToken(wrt, rqt, user)
 }
 
+// SignUp регистрирует нового пользователя
 func (hnd *UserHandler) SignUp(wrt http.ResponseWriter, rqt *http.Request) {
 	usr, arq := ProcessRequest(wrt, rqt)
 	if usr == nil || arq == nil {
@@ -107,9 +109,9 @@ func ProcessRequest(wrt http.ResponseWriter, rqt *http.Request) (*user.User, *Au
 	var arq AuthRequest
 	err := json.NewDecoder(rqt.Body).Decode(&arq)
 	if err != nil {
-		errSend := hdr.SendBadReq(wrt, "ошибка десериализации запроса")
+		errSend := hdr.SendBadReq(wrt, "error while deserialization")
 		if errSend != nil {
-			log.Printf("ошибка отправки Bad Request сообщения %v\n", errSend)
+			log.Printf("error while sending the bad request error message: %v\n", errSend)
 		}
 		return nil, nil
 	}
@@ -117,7 +119,7 @@ func ProcessRequest(wrt http.ResponseWriter, rqt *http.Request) (*user.User, *Au
 	if arq.Username == "" && arq.Password == "" {
 		errSend := hdr.SendBadReq(wrt, "ошибка: пользователь не отправил логин и пароль")
 		if errSend != nil {
-			log.Printf("ошибка отправки Bad Request сообщения %v\n", errSend)
+			log.Printf("error while sending the bad request error message: %v\n", errSend)
 		}
 		return nil, nil
 	}
@@ -125,7 +127,7 @@ func ProcessRequest(wrt http.ResponseWriter, rqt *http.Request) (*user.User, *Au
 	if arq.Username == "" {
 		errSend := hdr.SendBadReq(wrt, "ошибка: пользователь не отправил логин")
 		if errSend != nil {
-			log.Printf("ошибка отправки Bad Request сообщения %v\n", errSend)
+			log.Printf("error while sending the bad request error message: %v\n", errSend)
 		}
 		return nil, nil
 	}
@@ -133,7 +135,7 @@ func ProcessRequest(wrt http.ResponseWriter, rqt *http.Request) (*user.User, *Au
 	if arq.Password == "" {
 		errSend := hdr.SendBadReq(wrt, "ошибка: пользователь не отправил пароль")
 		if errSend != nil {
-			log.Printf("ошибка отправки Bad Request сообщения %v\n", errSend)
+			log.Printf("error while sending the bad request error message: %v\n", errSend)
 		}
 		return nil, nil
 	}
@@ -161,12 +163,13 @@ func ProcessToken(wrt http.ResponseWriter, rqt *http.Request, thisUser *user.Use
 	wrt.WriteHeader(http.StatusOK)
 }
 
+// validateUsername валидирует логин
 func validateUsername(wrt http.ResponseWriter, username string) bool {
 	check := utils.CheckLen(username, "недостаточная", "превышена допустимая", "логина", "логин", minLoginLen, maxLoginLen)
 	if check != "" {
 		errSend := hdr.SendBadReq(wrt, check)
 		if errSend != nil {
-			log.Printf("ошибка отправки Bad Request сообщения %v\n", errSend)
+			log.Printf("error while sending the bad request error message: %v\n", errSend)
 		}
 		return false
 	}
@@ -175,19 +178,20 @@ func validateUsername(wrt http.ResponseWriter, username string) bool {
 	if !re.MatchString(username) {
 		errSend := hdr.SendBadReq(wrt, "ошибка: недопустимый/ые символ/ы в логине -> логин может содержать только буквы, цифры, '-' и '_'")
 		if errSend != nil {
-			log.Printf("ошибка отправки Bad Request сообщения %v\n", errSend)
+			log.Printf("error while sending the bad request error message: %v\n", errSend)
 		}
 		return false
 	}
 	return true
 }
 
+// validatePassword валидирует пароль
 func validatePassword(wrt http.ResponseWriter, password string) bool {
 	check := utils.CheckLen(password, "недостаточная", "превышена допустимая", "пароля", "пароль", minPasswordLen, maxPasswordLen)
 	if check != "" {
 		errSend := hdr.SendBadReq(wrt, check)
 		if errSend != nil {
-			log.Printf("ошибка отправки Bad Request сообщения %v\n", errSend)
+			log.Printf("error while sending the bad request error message: %v\n", errSend)
 		}
 		return false
 	}
@@ -213,7 +217,7 @@ func validatePassword(wrt http.ResponseWriter, password string) bool {
 	if !hasUpper {
 		errSend := hdr.SendBadReq(wrt, "ошибка: в пароле отсутствует хотя бя одна заглавная буква")
 		if errSend != nil {
-			log.Printf("ошибка отправки Bad Request сообщения %v\n", errSend)
+			log.Printf("error while sending the bad request error message: %v\n", errSend)
 		}
 		return false
 	}
@@ -221,7 +225,7 @@ func validatePassword(wrt http.ResponseWriter, password string) bool {
 	if !hasLower {
 		errSend := hdr.SendBadReq(wrt, "ошибка: в пароле отсутствует хотя бя одна строчная буква")
 		if errSend != nil {
-			log.Printf("ошибка отправки Bad Request сообщения %v\n", errSend)
+			log.Printf("error while sending the bad request error message: %v\n", errSend)
 		}
 		return false
 	}
@@ -229,7 +233,7 @@ func validatePassword(wrt http.ResponseWriter, password string) bool {
 	if !hasNumber {
 		errSend := hdr.SendBadReq(wrt, "ошибка: в пароле отсутствует хотя бя одна цифра")
 		if errSend != nil {
-			log.Printf("ошибка отправки Bad Request сообщения %v\n", errSend)
+			log.Printf("error while sending the bad request error message: %v\n", errSend)
 		}
 		return false
 	}
@@ -237,7 +241,7 @@ func validatePassword(wrt http.ResponseWriter, password string) bool {
 	if !hasSpecial {
 		errSend := hdr.SendBadReq(wrt, "ошибка: в пароле отсутствует хотя бя один специальный символ")
 		if errSend != nil {
-			log.Printf("ошибка отправки Bad Request сообщения %v\n", errSend)
+			log.Printf("error while sending the bad request error message: %v\n", errSend)
 		}
 		return false
 	}

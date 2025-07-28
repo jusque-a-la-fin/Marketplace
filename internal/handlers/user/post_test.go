@@ -3,8 +3,10 @@ package user_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"log"
 	"marketplace/internal/datastore"
+	ihd "marketplace/internal/handlers/images"
 	uhd "marketplace/internal/handlers/user"
 	"marketplace/internal/middleware"
 	"net/http"
@@ -14,21 +16,30 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// Интеграционный тест на сценарий создания нового объявления
-func TestPostACard(t *testing.T) {
+func setupTestServerForPostACard(t *testing.T) (*httptest.Server, *uhd.UserHandler) {
 	dtb, err := datastore.CreateNewDB()
 	if err != nil {
 		log.Fatalf("error while connecting to the database: %v", err)
 	}
 
 	var uhr = GetUserHandler(t)
+	var ihr = GetImagesHandler(t)
 	rtr := mux.NewRouter()
 	rtr.HandleFunc("/sign-in", uhr.SignIn).Methods("POST")
 	rtr.HandleFunc("/post-a-card", middleware.RequireAuth(uhr.PostACard, dtb, true)).Methods("POST")
+	rtr.HandleFunc("/images/create", ihr.CreateImage).Methods("GET")
+	rtr.HandleFunc("/images", ihr.LoadImage).Methods("POST")
+	path := fmt.Sprintf("/images/{name:image%v\\.jpeg}", ihd.UUIDRE)
+	rtr.HandleFunc(path, ihr.GetImage).Methods("GET")
 
 	ts := httptest.NewServer(rtr)
 	t.Cleanup(ts.Close)
+	return ts, uhr
+}
 
+// TestPostACard тестирует сценарий создания нового объявления
+func TestPostACard(t *testing.T) {
+	ts, uhr := setupTestServerForPostACard(t)
 	name := "тест на сценарий создания объявления"
 	t.Run(name, func(t *testing.T) {
 		auth := uhd.AuthRequest{Username: "user1", Password: "W#_?e9o!m+B>tk7j"}
@@ -37,9 +48,10 @@ func TestPostACard(t *testing.T) {
 			t.Fatalf("Ошибка сериализации тела запроса клиента: %v", err)
 		}
 
-		resp, err := http.Post(ts.URL+"/sign-in", "application/json", bytes.NewBuffer(data))
+		fullURL := fmt.Sprintf("%s%s", ts.URL, "/sign-in")
+		resp, err := http.Post(fullURL, "application/json", bytes.NewBuffer(data))
 		if err != nil {
-			t.Fatalf("Failed to issue a POST: %v", err)
+			t.Fatalf("failed to issue a POST request: %v", err)
 		}
 		defer resp.Body.Close()
 
@@ -49,7 +61,8 @@ func TestPostACard(t *testing.T) {
 
 		token := resp.Header.Get("Authorization")
 
-		card := uhd.PostACardRequest{Title: "title1", Text: "text1", PictureURL: "https://www.example.com/images/image1.jpg", Price: "1000"}
+		imageURL := getImageURL(t, ts, uhr, auth.Username)
+		card := uhd.PostACardRequest{Title: "title1", Text: "text1", ImageURL: imageURL, Price: "1000"}
 		data, err = json.Marshal(card)
 		if err != nil {
 			t.Fatalf("Ошибка сериализации тела запроса клиента: %v", err)

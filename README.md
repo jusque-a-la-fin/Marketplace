@@ -7,3 +7,5 @@ git clone git@github.com:jusque-a-la-fin/Marketplace.git && cd Marketplace && do
 1) [Тесты на сценарий регистрации нового пользователя/авторизации зарегистрированного пользователя](https://github.com/jusque-a-la-fin/Marketplace/blob/main/internal/handlers/user/auth_test.go),  
 2) [Тест на сценарий создания нового объявления](https://github.com/jusque-a-la-fin/Marketplace/blob/main/internal/handlers/user/post_test.go).  
 3) [Тесты на сценарий получения ленты объявлений](https://github.com/jusque-a-la-fin/Marketplace/blob/main/internal/handlers/user/get_cards_test.go).
+
+

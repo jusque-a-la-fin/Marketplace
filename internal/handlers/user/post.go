@@ -1,6 +1,7 @@
 package user
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"image"
@@ -10,10 +11,10 @@ import (
 	"log"
 	"marketplace/internal/cards"
 	"marketplace/internal/handlers"
+	img "marketplace/internal/images"
 	"marketplace/internal/token"
 	"marketplace/internal/utils"
 	"net/http"
-	"net/url"
 	"strconv"
 )
 
@@ -28,16 +29,6 @@ const (
 	maxTextLen = 4000
 	// maxPriceValue — максимальная цена
 	maxPriceValue float64 = 1000000000000
-	// maxImageBytes — максимальный размер файла изображения в байтах (2 Мбайта)
-	maxImageBytes = 2000000
-	// minImageDim — минимальное количество пикселей по каждой стороне изображения
-	minImageDim = 500
-	// maxImageDim — максимальное количество пикселей по каждой стороне изображения
-	maxImageDim = 2000
-	// minAspectRatio — минимально допустимое соотношение ширины к высоте изображения
-	minAspectRatio = 0.8
-	// maxAspectRatio — максимально допустимое соотношение ширины к высоте изображения
-	maxAspectRatio = 1.2
 )
 
 // запрос с данными для создания объявления
@@ -46,12 +37,13 @@ type PostACardRequest struct {
 	Title string `json:"title"`
 	// Text — текст объявления
 	Text string `json:"text"`
-	// PictureURL — адрес изображения
-	PictureURL string `json:"picture_url"`
+	// ImageURL — ссылка на изображение
+	ImageURL string `json:"image_url"`
 	// Price — цена
 	Price string `json:"price"`
 }
 
+// PostACard создает новое объявление
 func (hnd *UserHandler) PostACard(wrt http.ResponseWriter, rqt *http.Request) {
 	var prq PostACardRequest
 	err := json.NewDecoder(rqt.Body).Decode(&prq)
@@ -67,7 +59,7 @@ func (hnd *UserHandler) PostACard(wrt http.ResponseWriter, rqt *http.Request) {
 	if check != "" {
 		errSend := handlers.SendBadReq(wrt, check)
 		if errSend != nil {
-			log.Printf("ошибка отправки Bad Request сообщения %v\n", errSend)
+			log.Printf("error while sending the bad request message: %v\n", errSend)
 		}
 		return
 	}
@@ -76,7 +68,7 @@ func (hnd *UserHandler) PostACard(wrt http.ResponseWriter, rqt *http.Request) {
 	if check != "" {
 		errSend := handlers.SendBadReq(wrt, check)
 		if errSend != nil {
-			log.Printf("ошибка отправки Bad Request сообщения %v\n", errSend)
+			log.Printf("error while sending the bad request message: %v\n", errSend)
 		}
 		return
 	}
@@ -84,22 +76,22 @@ func (hnd *UserHandler) PostACard(wrt http.ResponseWriter, rqt *http.Request) {
 	if err := validatePrice(prq.Price); err != nil {
 		errSend := handlers.SendBadReq(wrt, err.Error())
 		if errSend != nil {
-			log.Printf("ошибка отправки Bad Request сообщения %v\n", errSend)
+			log.Printf("error while sending the bad request message: %v\n", errSend)
 		}
 		return
 	}
 
-	// if err := validateImage(prq.PictureURL); err != nil {
-	// 	errSend := handlers.SendBadReq(wrt, err.Error())
-	// 	if errSend != nil {
-	// 		log.Printf("ошибка отправки Bad Request сообщения %v\n", errSend)
-	// 	}
-	// 	return
-	// }
+	if err := validateImage(prq.ImageURL); err != nil {
+		errSend := handlers.SendBadReq(wrt, err.Error())
+		if errSend != nil {
+			log.Printf("error while sending the bad request message: %v\n", errSend)
+		}
+		return
+	}
 
 	priceFloat64, err := strconv.ParseFloat(prq.Price, 64)
 	if err != nil {
-		errStr := fmt.Errorf("ошибка при преобразовании из string в float64: %v", err)
+		errStr := fmt.Errorf("error while conversion from string to float64: %v", err)
 		errSend := handlers.SendInternalServerError(wrt, errStr.Error())
 		if errSend != nil {
 			log.Printf("error while sending the internal server error message: %v\n", errSend)
@@ -107,7 +99,7 @@ func (hnd *UserHandler) PostACard(wrt http.ResponseWriter, rqt *http.Request) {
 		return
 	}
 
-	crd := &cards.CardInput{Title: prq.Title, Text: prq.Text, PictureURL: prq.PictureURL, Price: priceFloat64}
+	crd := &cards.CardInput{Title: prq.Title, Text: prq.Text, ImageURL: prq.ImageURL, Price: priceFloat64}
 	username, err := token.GetPayload(rqt)
 	if err != nil {
 		errSend := handlers.SendUnauthorized(wrt, err.Error())
@@ -143,77 +135,71 @@ func (hnd *UserHandler) PostACard(wrt http.ResponseWriter, rqt *http.Request) {
 	}
 }
 
-// validatePrice проверяет цену
+// validatePrice валидирует цену
 func validatePrice(priceStr string) error {
 	price, err := strconv.ParseFloat(priceStr, 64)
 	if err != nil {
-		return fmt.Errorf("price must be a valid number")
+		return fmt.Errorf("error while conversion from string to float64: %v", err)
 	}
 	if price <= 0 {
-		return fmt.Errorf("price must be greater than 0")
+		return fmt.Errorf("цена должна быть выше 0")
 	}
 	if price > maxPriceValue {
-		return fmt.Errorf("price must be at most %.0f", maxPriceValue)
+		return fmt.Errorf("цена не может быть выше %.0f", maxPriceValue)
 	}
 	return nil
 }
 
-// validateImage проверяет изображение на соответствие формату
-func validateImage(rawURL string) error {
-	u, err := url.ParseRequestURI(rawURL)
+// validateImage валидирует изображение
+func validateImage(imageURL string) error {
+	resp, err := http.Get(imageURL)
 	if err != nil {
-		return fmt.Errorf("invalid URL")
-	}
-
-	resp, err := http.Head(u.String())
-	if err != nil {
-		return fmt.Errorf("cannot HEAD URL")
+		return fmt.Errorf("failed to issue a GET request: %v", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("image URL returned status %d", resp.StatusCode)
-	}
-
-	ct := resp.Header.Get("Content-Type")
-	if ct != "image/jpeg" && ct != "image/png" {
-		return fmt.Errorf("unsupported content-type %s", ct)
-	}
-
-	if cl := resp.Header.Get("Content-Length"); cl != "" {
-		size, err := strconv.Atoi(cl)
-		if err != nil {
-			return fmt.Errorf("invalid content-length")
-		}
-		if size > maxImageBytes {
-			return fmt.Errorf("file too large: %d bytes (max %d)", size, maxImageBytes)
-		}
-	}
-
-	resp2, err := http.Get(u.String())
+	imageData, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("cannot download image")
+		return fmt.Errorf("ошибка получения изображения, которое должно быть создано: %v", err)
 	}
-	defer resp2.Body.Close()
 
-	limited := io.LimitReader(resp2.Body, maxImageBytes+1)
-	cfg, _, err := image.DecodeConfig(limited)
+	size := len(imageData)
+	if size == 0 {
+		return fmt.Errorf("empty image data")
+	}
+	if size > img.MaxImageBytes {
+		return fmt.Errorf("изображение превышает максимальный размер изображения = %d байтов, размер полученного изображения = %d байтов", img.MaxImageBytes, size)
+	}
+
+	// Определение content-type по первым 512 байтам
+	firstBytesLen := 512
+	if size < firstBytesLen {
+		firstBytesLen = size
+	}
+
+	contentType := http.DetectContentType(imageData[:firstBytesLen])
+	switch contentType {
+	case "image/jpeg", "image/png":
+	default:
+		return fmt.Errorf("неизвестный content-type %q", contentType)
+	}
+
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(imageData))
 	if err != nil {
 		return fmt.Errorf("cannot decode image: %v", err)
 	}
 
-	w, h := cfg.Width, cfg.Height
-	if w < minImageDim || h < minImageDim {
-		return fmt.Errorf("image dimensions too small: %dx%d (min %dx%d)", w, h, minImageDim, minImageDim)
+	width, height := cfg.Width, cfg.Height
+	if width < img.MinImageDim || height < img.MinImageDim {
+		return fmt.Errorf("недостаточное разрешение изображения. Разрешение полученного изображения = (%dx%d), минимальное возможное разрешение изображения = (%dx%d)", width, height, img.MinImageDim, img.MinImageDim)
 	}
-	if w > maxImageDim || h > maxImageDim {
-		return fmt.Errorf("image dimensions too large: %dx%d (max %dx%d)", w, h, maxImageDim, maxImageDim)
-	}
-
-	ratio := float64(w) / float64(h)
-	if ratio < minAspectRatio || ratio > maxAspectRatio {
-		return fmt.Errorf("invalid aspect ratio %.2f (allowed %.2f–%.2f)", ratio, minAspectRatio, maxAspectRatio)
+	if width > img.MaxImageDim || height > img.MaxImageDim {
+		return fmt.Errorf("превышено максимально возможное разрешение изображения. Разрешение полученного изображения = (%dx%d), максимально возможное разрешение изображения = (%dx%d)", width, height, img.MaxImageDim, img.MaxImageDim)
 	}
 
+	ratio := float64(width) / float64(height)
+	if ratio < img.MinAspectRatio || ratio > img.MaxAspectRatio {
+		return fmt.Errorf("неправильное соотношение ширины к высоте полученного изображения = %.2f. Диапазон допустимого соотношения ширины к высоте изображения = %.2f–%.2f", ratio, img.MinAspectRatio, img.MaxAspectRatio)
+	}
 	return nil
 }

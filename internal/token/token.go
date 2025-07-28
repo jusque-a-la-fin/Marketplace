@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
+	jwt "github.com/golang-jwt/jwt/v5"
 )
 
 var (
@@ -48,10 +48,10 @@ func GetPayload(rqt *http.Request) (string, error) {
 		return "", ErrNoToken
 	}
 
-	hashSecretGetter := func(token *jwt.Token) (interface{}, error) {
+	hashSecretGetter := func(token *jwt.Token) (any, error) {
 		_, ok := token.Method.(*jwt.SigningMethodHMAC)
 		if !ok {
-			return nil, fmt.Errorf("bad sign method")
+			return nil, fmt.Errorf("expected another signing method")
 		}
 		return ExampleTokenSecret, nil
 	}
@@ -65,6 +65,6 @@ func GetPayload(rqt *http.Request) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("error while fetching the payload")
 	}
-	claims := payload["user"].(map[string]interface{})
+	claims := payload["user"].(map[string]any)
 	return claims["username"].(string), nil
 }
